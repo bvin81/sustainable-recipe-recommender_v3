@@ -1,0 +1,436 @@
+<!DOCTYPE html>
+<html lang="hu">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Záró Kérdőív - Sustainable Recipe Recommender</title>
+    <style>
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+        }
+        .container {
+            background: white;
+            padding: 40px;
+            border-radius: 15px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.3);
+        }
+        .header {
+            text-align: center;
+            margin-bottom: 30px;
+        }
+        .progress-bar {
+            width: 100%;
+            height: 6px;
+            background: #e0e0e0;
+            border-radius: 3px;
+            margin-bottom: 30px;
+            overflow: hidden;
+        }
+        .progress-fill {
+            height: 100%;
+            background: linear-gradient(45deg, #27ae60, #2ecc71);
+            width: 90%;
+            transition: width 0.3s ease;
+        }
+        .form-section {
+            background: #f8f9fa;
+            padding: 25px;
+            border-radius: 10px;
+            margin: 25px 0;
+            border-left: 5px solid #3498db;
+        }
+        .question {
+            margin-bottom: 30px;
+        }
+        .question-title {
+            font-weight: bold;
+            color: #2c3e50;
+            margin-bottom: 15px;
+            font-size: 1.1em;
+        }
+        .likert-scale {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            background: white;
+            padding: 15px;
+            border-radius: 10px;
+            margin: 10px 0;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+        .scale-option {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            cursor: pointer;
+            padding: 10px;
+            border-radius: 8px;
+            transition: all 0.3s ease;
+            flex: 1;
+            max-width: 100px;
+        }
+        .scale-option:hover {
+            background: #f0f8ff;
+            transform: translateY(-2px);
+        }
+        .scale-option input[type="radio"] {
+            margin-bottom: 8px;
+            transform: scale(1.2);
+        }
+        .scale-label {
+            font-size: 12px;
+            text-align: center;
+            color: #666;
+            font-weight: bold;
+        }
+        .scale-number {
+            font-size: 18px;
+            font-weight: bold;
+            color: #2c3e50;
+            margin-bottom: 5px;
+        }
+        .textarea-group {
+            margin-top: 20px;
+        }
+        textarea {
+            width: 100%;
+            min-height: 100px;
+            padding: 15px;
+            border: 2px solid #e0e0e0;
+            border-radius: 10px;
+            font-family: inherit;
+            font-size: 14px;
+            resize: vertical;
+            transition: border-color 0.3s ease;
+            box-sizing: border-box;
+        }
+        textarea:focus {
+            outline: none;
+            border-color: #27ae60;
+        }
+        .btn {
+            background: linear-gradient(45deg, #27ae60, #2ecc71);
+            color: white;
+            padding: 15px 30px;
+            border: none;
+            border-radius: 25px;
+            font-size: 1.1em;
+            font-weight: bold;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            width: 100%;
+            box-shadow: 0 4px 15px rgba(39, 174, 96, 0.3);
+        }
+        .btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 6px 20px rgba(39, 174, 96, 0.4);
+        }
+        .btn:disabled {
+            background: #bdc3c7;
+            cursor: not-allowed;
+            transform: none;
+            box-shadow: none;
+        }
+        .completion-note {
+            background: #e8f5e8;
+            padding: 20px;
+            border-radius: 10px;
+            margin-bottom: 30px;
+            text-align: center;
+            border-left: 4px solid #27ae60;
+        }
+        .required-note {
+            color: #e74c3c;
+            font-size: 14px;
+            margin-bottom: 20px;
+            text-align: center;
+        }
+        .version-specific {
+            display: none;
+        }
+        @media (max-width: 768px) {
+            .likert-scale {
+                flex-direction: column;
+                gap: 10px;
+            }
+            .scale-option {
+                flex-direction: row;
+                max-width: 100%;
+                justify-content: flex-start;
+                gap: 15px;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>📋 Záró Kérdőív</h1>
+            <p>Az Ön véleménye segít fejleszteni a rendszert</p>
+        </div>
+
+        <div class="progress-bar">
+            <div class="progress-fill"></div>
+        </div>
+
+        <div class="completion-note">
+            🎉 <strong>Gratulálunk!</strong> Sikeresen befejezte a recept értékeléseket. Most néhány kérdés a rendszerről.
+        </div>
+
+        <div class="required-note">
+            * A csillaggal jelölt kérdések kitöltése kötelező
+        </div>
+
+        <form method="POST" id="questionnaireForm">
+            <div class="form-section">
+                <div class="question">
+                    <div class="question-title">
+                        🖥️ Mennyire volt könnyű használni a rendszert? *
+                    </div>
+                    <div class="likert-scale">
+                        {% for i in range(1, 6) %}
+                        <div class="scale-option">
+                            <input type="radio" name="system_usability" value="{{ i }}" id="usability_{{ i }}" required>
+                            <div class="scale-number">{{ i }}</div>
+                            <div class="scale-label">
+                                {% if i == 1 %}Nagyon nehéz
+                                {% elif i == 2 %}Nehéz
+                                {% elif i == 3 %}Átlagos
+                                {% elif i == 4 %}Könnyű
+                                {% else %}Nagyon könnyű
+                                {% endif %}
+                            </div>
+                        </div>
+                        {% endfor %}
+                    </div>
+                </div>
+
+                <div class="question">
+                    <div class="question-title">
+                       ✨ Mennyire volt jó minőségű a recept ajánlások? *
+                   </div>
+                   <div class="likert-scale">
+                       {% for i in range(1, 6) %}
+                       <div class="scale-option">
+                           <input type="radio" name="recommendation_quality" value="{{ i }}" id="quality_{{ i }}" required>
+                           <div class="scale-number">{{ i }}</div>
+                           <div class="scale-label">
+                               {% if i == 1 %}Nagyon rossz
+                               {% elif i == 2 %}Rossz
+                               {% elif i == 3 %}Átlagos
+                               {% elif i == 4 %}Jó
+                               {% else %}Kiváló
+                               {% endif %}
+                           </div>
+                       </div>
+                       {% endfor %}
+                   </div>
+               </div>
+
+               <div class="question">
+                   <div class="question-title">
+                       🤝 Mennyire bízik meg a rendszer ajánlásaiban? *
+                   </div>
+                   <div class="likert-scale">
+                       {% for i in range(1, 6) %}
+                       <div class="scale-option">
+                           <input type="radio" name="trust_level" value="{{ i }}" id="trust_{{ i }}" required>
+                           <div class="scale-number">{{ i }}</div>
+                           <div class="scale-label">
+                               {% if i == 1 %}Egyáltalán nem
+                               {% elif i == 2 %}Kevéssé
+                               {% elif i == 3 %}Közepesen
+                               {% elif i == 4 %}Nagyon
+                               {% else %}Teljesen
+                               {% endif %}
+                           </div>
+                       </div>
+                       {% endfor %}
+                   </div>
+               </div>
+
+               {% if version == 'v2' or version == 'v3' %}
+               <div class="question version-specific" style="display: block;">
+                   <div class="question-title">
+                       💡 Mennyire voltak világosak és érthetőek a magyarázatok? *
+                   </div>
+                   <div class="likert-scale">
+                       {% for i in range(1, 6) %}
+                       <div class="scale-option">
+                           <input type="radio" name="explanation_clarity" value="{{ i }}" id="clarity_{{ i }}" required>
+                           <div class="scale-number">{{ i }}</div>
+                           <div class="scale-label">
+                               {% if i == 1 %}Nagyon zavaros
+                               {% elif i == 2 %}Zavaros
+                               {% elif i == 3 %}Átlagos
+                               {% elif i == 4 %}Világos
+                               {% else %}Nagyon világos
+                               {% endif %}
+                           </div>
+                       </div>
+                       {% endfor %}
+                   </div>
+               </div>
+               {% endif %}
+
+               <div class="question">
+                   <div class="question-title">
+                       🌱 Mennyire fontos Önnek, hogy egy recept ajánló figyelembe vegye a környezeti hatásokat? *
+                   </div>
+                   <div class="likert-scale">
+                       {% for i in range(1, 6) %}
+                       <div class="scale-option">
+                           <input type="radio" name="sustainability_importance" value="{{ i }}" id="sustainability_{{ i }}" required>
+                           <div class="scale-number">{{ i }}</div>
+                           <div class="scale-label">
+                               {% if i == 1 %}Egyáltalán nem
+                               {% elif i == 2 %}Kevéssé
+                               {% elif i == 3 %}Közepesen
+                               {% elif i == 4 %}Nagyon
+                               {% else %}Rendkívül
+                               {% endif %}
+                           </div>
+                       </div>
+                       {% endfor %}
+                   </div>
+               </div>
+
+               <div class="question">
+                   <div class="question-title">
+                       😊 Összességében mennyire elégedett a rendszerrel? *
+                   </div>
+                   <div class="likert-scale">
+                       {% for i in range(1, 6) %}
+                       <div class="scale-option">
+                           <input type="radio" name="overall_satisfaction" value="{{ i }}" id="satisfaction_{{ i }}" required>
+                           <div class="scale-number">{{ i }}</div>
+                           <div class="scale-label">
+                               {% if i == 1 %}Nagyon elégedetlen
+                               {% elif i == 2 %}Elégedetlen
+                               {% elif i == 3 %}Semleges
+                               {% elif i == 4 %}Elégedett
+                               {% else %}Nagyon elégedett
+                               {% endif %}
+                           </div>
+                       </div>
+                       {% endfor %}
+                   </div>
+               </div>
+           </div>
+
+           <div class="form-section">
+               <div class="question">
+                   <div class="question-title">
+                       💭 További megjegyzések, észrevételek (opcionális)
+                   </div>
+                   <div class="textarea-group">
+                       <textarea name="additional_comments" placeholder="Írja le véleményét a rendszerről, javaslatait a fejlesztéshez, vagy bármilyen más észrevételét..."></textarea>
+                   </div>
+               </div>
+           </div>
+
+           <div style="text-align: center; margin-top: 40px;">
+               <button type="submit" class="btn" id="submitBtn" disabled>
+                   🏁 Tanulmány Befejezése
+               </button>
+           </div>
+       </form>
+   </div>
+
+   <script>
+       const form = document.getElementById('questionnaireForm');
+       const submitBtn = document.getElementById('submitBtn');
+       
+       // Required questions
+       const requiredQuestions = [
+           'system_usability',
+           'recommendation_quality', 
+           'trust_level',
+           {% if version == 'v2' or version == 'v3' %}
+           'explanation_clarity',
+           {% endif %}
+           'sustainability_importance',
+           'overall_satisfaction'
+       ];
+
+       function validateForm() {
+           const allAnswered = requiredQuestions.every(question => {
+               const radios = document.querySelectorAll(`input[name="${question}"]`);
+               return Array.from(radios).some(radio => radio.checked);
+           });
+
+           submitBtn.disabled = !allAnswered;
+           
+           if (allAnswered) {
+               submitBtn.style.background = 'linear-gradient(45deg, #27ae60, #2ecc71)';
+               submitBtn.textContent = '🏁 Tanulmány Befejezése';
+           } else {
+               submitBtn.style.background = '#bdc3c7';
+               submitBtn.textContent = '⏳ Válaszoljon minden kérdésre';
+           }
+       }
+
+       // Add event listeners to all radio buttons
+       document.querySelectorAll('input[type="radio"]').forEach(radio => {
+           radio.addEventListener('change', validateForm);
+       });
+
+       // Form submission
+       form.addEventListener('submit', function(e) {
+           e.preventDefault();
+           
+           // Final validation
+           if (submitBtn.disabled) {
+               alert('Kérjük válaszoljon minden kötelező kérdésre!');
+               return;
+           }
+
+           // Progress bar animation
+           document.querySelector('.progress-fill').style.width = '100%';
+           
+           // Button feedback
+           submitBtn.disabled = true;
+           submitBtn.textContent = '⏳ Adatok mentése...';
+           submitBtn.style.background = '#95a5a6';
+           
+           // Submit form
+           setTimeout(() => {
+               form.submit();
+           }, 1000);
+       });
+
+       // Visual feedback for radio selection
+       document.querySelectorAll('.scale-option').forEach(option => {
+           const radio = option.querySelector('input[type="radio"]');
+           
+           option.addEventListener('click', function() {
+               // Remove selection from siblings
+               const questionName = radio.name;
+               document.querySelectorAll(`input[name="${questionName}"]`).forEach(r => {
+                   r.closest('.scale-option').style.background = '';
+                   r.closest('.scale-option').style.transform = '';
+               });
+               
+               // Highlight selected option
+               if (radio.checked) {
+                   option.style.background = '#e8f5e8';
+                   option.style.transform = 'translateY(-2px)';
+               }
+           });
+       });
+
+       // Initial validation
+       validateForm();
+
+       // Analytics tracking
+       document.addEventListener('DOMContentLoaded', function() {
+           console.log('Questionnaire loaded for version: {{ version }}');
+       });
+   </script>
+</body>
+</html>

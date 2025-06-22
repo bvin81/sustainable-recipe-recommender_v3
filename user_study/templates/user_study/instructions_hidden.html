@@ -1,0 +1,194 @@
+<!-- user_study/templates/user_study/instructions_hidden.html -->
+<!DOCTYPE html>
+<html lang="hu">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Instrukciók - Sustainable Recipe Recommender</title>
+    <style>
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+        }
+        .container {
+            background: white;
+            padding: 40px;
+            border-radius: 15px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.3);
+        }
+        .header {
+            text-align: center;
+            margin-bottom: 30px;
+        }
+        .progress-bar {
+            width: 100%;
+            height: 6px;
+            background: #e0e0e0;
+            border-radius: 3px;
+            margin-bottom: 30px;
+            overflow: hidden;
+        }
+        .progress-fill {
+            height: 100%;
+            background: linear-gradient(45deg, #27ae60, #2ecc71);
+            width: 50%;
+            transition: width 0.3s ease;
+        }
+        .instruction-box {
+            background: #f8f9fa;
+            padding: 25px;
+            border-radius: 10px;
+            margin: 20px 0;
+            border-left: 5px solid #3498db;
+        }
+        .step {
+            display: flex;
+            align-items: flex-start;
+            margin: 20px 0;
+            padding: 15px;
+            background: white;
+            border-radius: 10px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+        .step-number {
+            background: #3498db;
+            color: white;
+            width: 30px;
+            height: 30px;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-weight: bold;
+            margin-right: 15px;
+            flex-shrink: 0;
+        }
+        .btn {
+            background: linear-gradient(45deg, #27ae60, #2ecc71);
+            color: white;
+            padding: 15px 30px;
+            text-decoration: none;
+            border-radius: 25px;
+            font-size: 1.1em;
+            font-weight: bold;
+            text-align: center;
+            transition: all 0.3s ease;
+            display: inline-block;
+            box-shadow: 0 4px 15px rgba(39, 174, 96, 0.3);
+        }
+        .btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 6px 20px rgba(39, 174, 96, 0.4);
+        }
+        .important-note {
+            background: #e8f5e8;
+            padding: 20px;
+            border-radius: 10px;
+            border-left: 4px solid #27ae60;
+            margin: 20px 0;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>📖 Instrukciók</h1>
+            <p>Minden, amit tudnia kell a tanulmányról</p>
+        </div>
+
+        <div class="progress-bar">
+            <div class="progress-fill"></div>
+        </div>
+
+        <div class="instruction-box">
+            <h2>🎯 A Feladat</h2>
+            <p>Egy <strong>intelligens recept ajánló rendszert</strong> fog tesztelni, amely személyre szabott ajánlásokat ad az Ön számára. A cél, hogy értékelje mennyire hasznosak és vonzóak ezek az ajánlások.</p>
+        </div>
+
+        <div class="step">
+            <div class="step-number">1</div>
+            <div class="step-content">
+                <h3>🍽️ Magyar recept Ajánlások</h3>
+                <p>A rendszer <strong>5 magyar recept ajánlást</strong> fog mutatni Önnek. Minden receptnál látni fogja:</p>
+                <ul>
+                    <li>📸 <strong>recept fotó</strong> - vizuális előnézet</li>
+                    <li>📝 <strong>recept neve és összetevői</strong></li>
+                    <li>📋 <strong>Elkészítési útmutató</strong></li>
+                    <li>⭐ <strong>Értékelési pontszámok</strong> különböző szempontokból</li>
+                    <li>💡 <strong>Ajánlási indoklás</strong> - miért ajánlja a rendszer</li>
+                </ul>
+            </div>
+        </div>
+
+        <div class="step">
+            <div class="step-number">2</div>
+            <div class="step-content">
+                <h3>⭐ recept Értékelések</h3>
+                <p>Minden receptt értékeljen <strong>1-5 csillag</strong> skálán:</p>
+                
+                <div style="background: #fff8e1; padding: 15px; border-radius: 8px; margin: 15px 0;">
+                    <p><strong>⭐ 1 csillag:</strong> Egyáltalán nem tetszik / nem készíteném el</p>
+                    <p><strong>⭐⭐ 2 csillag:</strong> Nem tetszik</p>
+                    <p><strong>⭐⭐⭐ 3 csillag:</strong> Semleges / talán</p>
+                    <p><strong>⭐⭐⭐⭐ 4 csillag:</strong> Tetszik / szívesen elkészíteném</p>
+                    <p><strong>⭐⭐⭐⭐⭐ 5 csillag:</strong> Nagyon tetszik / biztosan elkészítem</p>
+                </div>
+
+                <p><strong>Mire figyeljen az értékelésnél:</strong></p>
+                <ul>
+                    <li>🎯 Mennyire vonzó Önnek ez a recept?</li>
+                    <li>🛒 Megvásárolná és elkészítené ezeket az összetevőket?</li>
+                    <li>💚 Mennyire felel meg az Ön ízlésének és szokásainak?</li>
+                </ul>
+            </div>
+        </div>
+
+        <div class="step">
+            <div class="step-number">3</div>
+            <div class="step-content">
+                <h3>💡 Magyarázatok Értékelése</h3>
+                <p>Minden receptnál megjelenik egy <strong>magyarázat</strong>, hogy miért ajánlja a rendszer. Értékelje mennyire:</p>
+                <ul>
+                    <li>📖 <strong>Érthető</strong> - világos és könnyen követhető</li>
+                    <li>🎯 <strong>Hasznos</strong> - segít a döntésében</li>
+                    <li>🤝 <strong>Megbízható</strong> - elhiszi és elfogadja az indoklást</li>
+                </ul>
+            </div>
+        </div>
+
+        <div class="step">
+            <div class="step-number">4</div>
+            <div class="step-content">
+                <h3>📋 Záró Kérdőív</h3>
+                <p>A recept értékelések után rövid kérdőívet tölt ki a rendszerről:</p>
+                <ul>
+                    <li>🖥️ Mennyire volt könnyű használni?</li>
+                    <li>✨ Mennyire volt jó minőségű az ajánlás?</li>
+                    <li>🤝 Mennyire bízik meg a rendszerben?</li>
+                    <li>🎯 Mennyire érezte személyre szabottnak?</li>
+                    <li>😊 Mennyire elégedett összességében?</li>
+                </ul>
+            </div>
+        </div>
+
+        <div class="important-note">
+            <h3>❗ Fontos Tudnivalók</h3>
+            <ul>
+                <li>🎭 <strong>Természetes viselkedés:</strong> Úgy értékeljen, ahogy normális esetben tenné</li>
+                <li>🏠 <strong>Saját preferenciák:</strong> A saját ízlése és főzési szokásai szerint döntsen</li>
+                <li>⏰ <strong>Időkorlát nincs:</strong> Annyi időt vehet igénybe, amennyi szükséges</li>
+                <li>🔄 <strong>Nincs helyes válasz:</strong> Az Ön őszinte véleménye a legfontosabb</li>
+                <li>🔒 <strong>Névtelenség:</strong> Semmilyen személyes információ nem tárolódik</li>
+            </ul>
+        </div>
+
+        <div style="text-align: center; margin-top: 40px;">
+            <a href="/study" class="btn">🚀 recept Ajánlások Megtekintése</a>
+        </div>
+    </div>
+</body>
+</html>

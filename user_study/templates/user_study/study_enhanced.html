@@ -1,0 +1,680 @@
+<!DOCTYPE html>
+<html lang="hu">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Recept Ajánlások</title>
+    <style>
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 20px;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+        }
+        .container {
+            background: white;
+            padding: 40px;
+            border-radius: 15px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.3);
+        }
+        .header {
+            text-align: center;
+            margin-bottom: 30px;
+        }
+        .progress-bar {
+            width: 100%;
+            height: 6px;
+            background: #e0e0e0;
+            border-radius: 3px;
+            margin-bottom: 30px;
+            overflow: hidden;
+        }
+        .progress-fill {
+            height: 100%;
+            background: linear-gradient(45deg, #27ae60, #2ecc71);
+            width: 75%;
+            transition: width 0.3s ease;
+        }
+        .instruction-banner {
+            background: #f8f9fa;
+            padding: 20px;
+            border-radius: 10px;
+            margin-bottom: 30px;
+            border-left: 5px solid #3498db;
+            text-align: center;
+        }
+        .recipe-grid {
+            display: grid;
+            gap: 30px;
+            margin-bottom: 40px;
+        }
+        .recipe-card {
+            background: white;
+            border: 2px solid #e0e0e0;
+            border-radius: 15px;
+            padding: 0;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.1);
+            transition: all 0.3s ease;
+            overflow: hidden;
+        }
+        .recipe-card:hover {
+            transform: translateY(-5px);
+            box-shadow: 0 8px 25px rgba(0,0,0,0.15);
+        }
+        .recipe-card.rated {
+            border-color: #27ae60;
+            background: #f8fff8;
+        }
+        .recipe-image {
+            width: 100%;
+            height: 200px;
+            object-fit: cover;
+            border-bottom: 1px solid #e0e0e0;
+        }
+        .recipe-content {
+            padding: 25px;
+        }
+        .recipe-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-start;
+            margin-bottom: 15px;
+        }
+        .recipe-title {
+            font-size: 1.4em;
+            font-weight: bold;
+            color: #2c3e50;
+            margin: 0;
+            flex: 1;
+        }
+        .recipe-id {
+            background: #ecf0f1;
+            color: #7f8c8d;
+            padding: 4px 8px;
+            border-radius: 12px;
+            font-size: 12px;
+            font-weight: bold;
+        }
+        .ingredients {
+            background: #f8f9fa;
+            padding: 15px;
+            border-radius: 10px;
+            margin: 15px 0;
+            border-left: 4px solid #3498db;
+        }
+        .ingredients-label {
+            font-weight: bold;
+            color: #2c3e50;
+            margin-bottom: 8px;
+            display: block;
+        }
+        .instructions {
+            background: #fff8e1;
+            padding: 15px;
+            border-radius: 10px;
+            margin: 15px 0;
+            border-left: 4px solid #ffc107;
+        }
+        .instructions-label {
+            font-weight: bold;
+            color: #e65100;
+            margin-bottom: 8px;
+            display: block;
+        }
+        .instructions-text {
+            color: #5d4037;
+            line-height: 1.5;
+        }
+        .metrics {
+            display: flex;
+            gap: 15px;
+            margin: 20px 0;
+            flex-wrap: wrap;
+        }
+        .metric {
+            background: #f1f3f4;
+            padding: 8px 12px;
+            border-radius: 20px;
+            font-size: 14px;
+            font-weight: bold;
+            display: flex;
+            align-items: center;
+            gap: 5px;
+        }
+        .metric.health { background: #e8f5e8; color: #2e7d32; }
+        .metric.environment { background: #e3f2fd; color: #1976d2; }
+        .metric.popularity { background: #fff3e0; color: #f57c00; }
+        .explanation {
+            background: #fffbf0;
+            padding: 20px;
+            border-radius: 10px;
+            margin: 20px 0;
+            border-left: 4px solid #ffc107;
+        }
+        .explanation-title {
+            font-weight: bold;
+            color: #e65100;
+            margin-bottom: 10px;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+        .explanation-content {
+            color: #5d4037;
+            line-height: 1.5;
+        }
+        .explanation-detailed {
+            line-height: 1.6;
+        }
+        .explanation-item {
+            display: flex;
+            align-items: flex-start;
+            margin: 10px 0;
+            padding: 10px;
+            background: rgba(255, 255, 255, 0.7);
+            border-radius: 8px;
+        }
+        .explanation-icon {
+            margin-right: 10px;
+            font-size: 1.2em;
+        }
+        .explanation-summary {
+            margin-top: 15px;
+            padding: 15px;
+            background: #e8f5e8;
+            border-radius: 8px;
+            text-align: center;
+        }
+        .rating-section {
+            background: #f8f9fa;
+            padding: 20px;
+            border-radius: 10px;
+            margin-top: 20px;
+        }
+        .rating-title {
+            font-weight: bold;
+            margin-bottom: 15px;
+            color: #2c3e50;
+        }
+        .star-rating {
+            display: flex;
+            gap: 5px;
+            margin-bottom: 15px;
+            justify-content: center;
+        }
+        .star {
+            font-size: 32px;
+            color: #ddd;
+            cursor: pointer;
+            transition: all 0.2s ease;
+            user-select: none;
+        }
+        .star.active,
+        .star:hover {
+            color: #ffd700;
+            transform: scale(1.1);
+        }
+        .star.active {
+            animation: starPulse 0.3s ease;
+        }
+        @keyframes starPulse {
+            0% { transform: scale(1.1); }
+            50% { transform: scale(1.3); }
+            100% { transform: scale(1.1); }
+        }
+        .explanation-rating {
+            margin-top: 15px;
+            padding-top: 15px;
+            border-top: 1px solid #e0e0e0;
+        }
+        .explanation-options {
+            display: flex;
+            gap: 10px;
+            flex-wrap: wrap;
+            justify-content: center;
+        }
+        .explanation-option {
+            background: #e3f2fd;
+            color: #1976d2;
+            padding: 8px 16px;
+            border: 2px solid #e3f2fd;
+            border-radius: 20px;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            font-size: 14px;
+            user-select: none;
+        }
+        .explanation-option:hover {
+            background: #1976d2;
+            color: white;
+        }
+        .explanation-option.selected {
+            background: #1976d2;
+            color: white;
+            border-color: #1976d2;
+        }
+        .rating-feedback {
+            margin-top: 15px;
+            padding: 10px;
+            border-radius: 8px;
+            font-weight: bold;
+            text-align: center;
+            opacity: 0;
+            transition: opacity 0.3s ease;
+        }
+        .rating-feedback.show {
+            opacity: 1;
+        }
+        .rating-feedback.positive {
+            background: #e8f5e8;
+            color: #2e7d32;
+        }
+        .rating-feedback.neutral {
+            background: #fff3e0;
+            color: #f57c00;
+        }
+        .rating-feedback.negative {
+            background: #ffebee;
+            color: #c62828;
+        }
+        .continue-section {
+            text-align: center;
+            margin-top: 40px;
+            padding-top: 30px;
+            border-top: 2px solid #e0e0e0;
+        }
+        .rating-progress {
+            background: #f1f3f4;
+            padding: 15px;
+            border-radius: 10px;
+            margin-bottom: 20px;
+        }
+        .progress-text {
+            font-weight: bold;
+            color: #2c3e50;
+            margin-bottom: 8px;
+        }
+        .progress-bar-small {
+            width: 100%;
+            height: 8px;
+            background: #e0e0e0;
+            border-radius: 4px;
+            overflow: hidden;
+        }
+        .progress-fill-small {
+            height: 100%;
+            background: linear-gradient(45deg, #27ae60, #2ecc71);
+            transition: width 0.5s ease;
+            border-radius: 4px;
+        }
+        .btn {
+            background: linear-gradient(45deg, #27ae60, #2ecc71);
+            color: white;
+            padding: 15px 30px;
+            text-decoration: none;
+            border-radius: 25px;
+            font-size: 1.1em;
+            font-weight: bold;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            display: inline-block;
+            box-shadow: 0 4px 15px rgba(39, 174, 96, 0.3);
+            border: none;
+        }
+        .btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 6px 20px rgba(39, 174, 96, 0.4);
+        }
+        .btn:disabled {
+            background: #bdc3c7;
+            cursor: not-allowed;
+            transform: none;
+            box-shadow: none;
+        }
+        .completion-message {
+            background: #e8f5e8;
+            padding: 20px;
+            border-radius: 10px;
+            text-align: center;
+            margin-bottom: 20px;
+            border-left: 4px solid #27ae60;
+        }
+        .recipe-placeholder {
+            width: 100%;
+            height: 200px;
+            background: linear-gradient(45deg, #f8f9fa, #e9ecef);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: #6c757d;
+            font-size: 3em;
+            border-bottom: 1px solid #e0e0e0;
+        }
+        @media (max-width: 768px) {
+            .recipe-header {
+                flex-direction: column;
+                gap: 10px;
+            }
+            .metrics {
+                justify-content: center;
+            }
+            .explanation-options {
+                justify-content: center;
+            }
+            .star-rating {
+                justify-content: center;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>🍽️ Recept Ajánlások</h1>
+            <p>Értékelje az alábbi recepteket</p>
+        </div>
+
+        <div class="progress-bar">
+            <div class="progress-fill"></div>
+        </div>
+
+        <div class="instruction-banner">
+            <strong>📋 Feladat:</strong> Értékelje minden receptet 1-5 csillag skálán az alapján, hogy mennyire tetszik és elkészítené-e!
+            <br><strong>💡 Plusz:</strong> Értékelje az ajánlási magyarázatok hasznosságát is!
+        </div>
+
+        <div class="rating-progress">
+            <div class="progress-text">Értékelési Haladás: <span id="ratingCount">0</span>/{{ recommendations|length }}</div>
+            <div class="progress-bar-small">
+                <div class="progress-fill-small" id="ratingProgressBar" style="width: 0%;"></div>
+            </div>
+        </div>
+
+        <div class="recipe-grid">
+            {% for recipe in recommendations %}
+            <div class="recipe-card" data-recipe-id="{{ recipe.recipeid }}" data-view-start="{{ loop.index0 }}">
+                <!-- Recept kép -->
+                {% if recipe.images and recipe.images != '' %}
+                    <img src="{{ recipe.images }}" alt="{{ recipe.title }}" class="recipe-image" 
+                         onerror="this.style.display='none'; this.nextElementSibling.style.display='flex';">
+                    <div class="recipe-placeholder" style="display: none;">🍽️</div>
+                {% else %}
+                    <div class="recipe-placeholder">🍽️</div>
+                {% endif %}
+
+                <div class="recipe-content">
+                    <div class="recipe-header">
+                        <h2 class="recipe-title">{{ recipe.title }}</h2>
+                        <span class="recipe-id">#{{ recipe.recipeid }}</span>
+                    </div>
+
+                    <div class="ingredients">
+                        <span class="ingredients-label">🥘 Főbb összetevők:</span>
+                        <div class="ingredients-list">{{ recipe.ingredients }}</div>
+                    </div>
+
+                    {% if recipe.instructions and recipe.instructions != '' %}
+                    <div class="instructions">
+                        <span class="instructions-label">📋 Elkészítés:</span>
+                        <div class="instructions-text">{{ recipe.instructions[:300] }}{% if recipe.instructions|length > 300 %}...{% endif %}</div>
+                    </div>
+                    {% endif %}
+
+                    <div class="metrics">
+                        <div class="metric health">
+                            💚 Egészség: {{ "%.0f"|format(recipe.HSI) }}/100
+                        </div>
+                        <div class="metric environment">
+                            🌱 Környezet: {{ "%.0f"|format(recipe.ESI) }}/100
+                        </div>
+                        <div class="metric popularity">
+                            ⭐ Népszerűség: {{ "%.0f"|format(recipe.PPI) }}/100
+                        </div>
+                    </div>
+
+                    <div class="explanation">
+                        <div class="explanation-title">
+                            💡 Miért ajánljuk ezt a receptet?
+                        </div>
+                        <div class="explanation-content">
+                            {{ recipe.explanation|safe }}
+                        </div>
+                    </div>
+
+                    <div class="rating-section">
+                        <div class="rating-title">⭐ Mennyire tetszik ez a recept?</div>
+                        
+                        <div class="star-rating" data-recipe-id="{{ recipe.recipeid }}">
+                            {% for i in range(1, 6) %}
+                            <span class="star" data-rating="{{ i }}">⭐</span>
+                            {% endfor %}
+                        </div>
+                        
+                        <div class="rating-feedback" id="feedback-{{ recipe.recipeid }}"></div>
+
+                        <div class="explanation-rating">
+                            <div class="rating-title">💭 Mennyire volt hasznos a magyarázat?</div>
+                            <div class="explanation-options" data-recipe-id="{{ recipe.recipeid }}">
+                                <div class="explanation-option" data-helpful="1">Nagyon hasznos</div>
+                                <div class="explanation-option" data-helpful="2">Hasznos</div>
+                                <div class="explanation-option" data-helpful="3">Semleges</div>
+                                <div class="explanation-option" data-helpful="4">Nem hasznos</div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            {% endfor %}
+        </div>
+
+        <div class="continue-section">
+            <div id="completionMessage" class="completion-message" style="display: none;">
+                🎉 <strong>Kiváló!</strong> Az összes receptet értékelte. Most folytathatja a záró kérdőívvel.
+            </div>
+            
+            <button id="continueBtn" class="btn" onclick="location.href='/questionnaire'" disabled>
+                📋 Folytatás a Kérdőívvel
+            </button>
+        </div>
+    </div>
+
+    <script>
+        let ratingsGiven = 0;
+        const totalRecipes = {{ recommendations|length }};
+        let recipeRatings = {};
+        let explanationRatings = {};
+        let viewStartTimes = {};
+
+        // Initialize view tracking
+        document.querySelectorAll('.recipe-card').forEach(card => {
+            const recipeId = card.dataset.recipeId;
+            viewStartTimes[recipeId] = Date.now();
+        });
+
+        // Star rating functionality
+        document.querySelectorAll('.star-rating').forEach(ratingContainer => {
+            const recipeId = ratingContainer.dataset.recipeId;
+            const stars = ratingContainer.querySelectorAll('.star');
+            
+            stars.forEach((star, index) => {
+                star.addEventListener('mouseenter', () => {
+                    highlightStars(stars, index + 1);
+                });
+                
+                star.addEventListener('mouseleave', () => {
+                    const currentRating = recipeRatings[recipeId] || 0;
+                    highlightStars(stars, currentRating);
+                });
+                
+                star.addEventListener('click', () => {
+                    const rating = index + 1;
+                    setRating(recipeId, rating, stars);
+                });
+            });
+        });
+
+        // Explanation rating functionality
+        document.querySelectorAll('.explanation-options').forEach(optionContainer => {
+            const recipeId = optionContainer.dataset.recipeId;
+            const options = optionContainer.querySelectorAll('.explanation-option');
+            
+            options.forEach(option => {
+                option.addEventListener('click', () => {
+                    // Remove previous selection
+                    options.forEach(opt => opt.classList.remove('selected'));
+                    
+                    // Add selection to clicked option
+                    option.classList.add('selected');
+                    
+                    // Store rating
+                    const helpfulValue = parseInt(option.dataset.helpful);
+                    explanationRatings[recipeId] = helpfulValue;
+                    
+                    // Send to server
+                    sendExplanationRating(recipeId, helpfulValue);
+                });
+            });
+        });
+
+        function highlightStars(stars, rating) {
+            stars.forEach((star, index) => {
+                if (index < rating) {
+                    star.classList.add('active');
+                } else {
+                    star.classList.remove('active');
+                }
+            });
+        }
+
+        function setRating(recipeId, rating, stars) {
+            // Store rating
+            if (!recipeRatings[recipeId]) {
+                ratingsGiven++;
+                updateProgress();
+            }
+            recipeRatings[recipeId] = rating;
+            
+            // Visual feedback
+            highlightStars(stars, rating);
+            showRatingFeedback(recipeId, rating);
+            
+            // Mark card as rated
+            const card = document.querySelector(`[data-recipe-id="${recipeId}"]`);
+            card.classList.add('rated');
+            
+            // Calculate view time
+            const viewTime = (Date.now() - viewStartTimes[recipeId]) / 1000;
+            
+            // Send to server
+            sendRating(recipeId, rating, viewTime);
+            
+            // Check if all ratings given
+            checkCompletion();
+        }
+
+        function showRatingFeedback(recipeId, rating) {
+            const feedback = document.getElementById(`feedback-${recipeId}`);
+            let message, className;
+            
+            if (rating >= 4) {
+                message = "😊 Nagyszerű! Ez tetszik Önnek!";
+                className = "positive";
+            } else if (rating >= 3) {
+                message = "👍 Rendben, semleges vélemény.";
+                className = "neutral";
+            } else {
+                message = "👎 Értem, ez nem az Ön ízlése.";
+                className = "negative";
+            }
+            
+            feedback.textContent = message;
+            feedback.className = `rating-feedback ${className} show`;
+        }
+
+        function updateProgress() {
+            document.getElementById('ratingCount').textContent = ratingsGiven;
+            const percentage = (ratingsGiven / totalRecipes) * 100;
+            document.getElementById('ratingProgressBar').style.width = percentage + '%';
+        }
+
+        function checkCompletion() {
+            if (ratingsGiven >= totalRecipes) {
+                document.getElementById('completionMessage').style.display = 'block';
+                document.getElementById('continueBtn').disabled = false;
+                
+                // Scroll to completion message
+                document.getElementById('completionMessage').scrollIntoView({
+                    behavior: 'smooth',
+                    block: 'center'
+                });
+            }
+        }
+
+        async function sendRating(recipeId, rating, viewTime) {
+            try {
+                const explanationHelpful = explanationRatings[recipeId] || null;
+                const interactionOrder = Object.keys(recipeRatings).length;
+                
+                const response = await fetch('/rate_recipe', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({
+                        recipe_id: parseInt(recipeId),
+                        rating: rating,
+                        explanation_helpful: explanationHelpful,
+                        view_time_seconds: viewTime,
+                        interaction_order: interactionOrder
+                    })
+                });
+                
+                if (!response.ok) {
+                    console.error('Failed to send rating');
+                }
+            } catch (error) {
+                console.error('Error sending rating:', error);
+            }
+        }
+
+        async function sendExplanationRating(recipeId, helpfulValue) {
+            try {
+                const rating = recipeRatings[recipeId] || null;
+                const viewTime = (Date.now() - viewStartTimes[recipeId]) / 1000;
+                
+                const response = await fetch('/rate_recipe', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({
+                        recipe_id: parseInt(recipeId),
+                        rating: rating,
+                        explanation_helpful: helpfulValue,
+                        view_time_seconds: viewTime
+                    })
+                });
+                
+                if (!response.ok) {
+                    console.error('Failed to send explanation rating');
+                }
+            } catch (error) {
+                console.error('Error sending explanation rating:', error);
+            }
+        }
+
+        // Initialize page
+        document.addEventListener('DOMContentLoaded', function() {
+            console.log('Enhanced study page loaded');
+            console.log('Total recipes to rate:', totalRecipes);
+            
+            // Store ratings in session for later use
+            window.addEventListener('beforeunload', function() {
+                sessionStorage.setItem('recipe_ratings', JSON.stringify(Object.values(recipeRatings)));
+            });
+        });
+    </script>
+</body>
+</html>
