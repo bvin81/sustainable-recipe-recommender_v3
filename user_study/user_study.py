@@ -242,80 +242,6 @@ class HybridRecipeRecommender:
         print(f"✅ {len(recommendations)} ajánlás generálva ({version}) - JAVÍTOTT similarity")
         return recommendations
     
-    # A többi metódus (clean_ingredients, build_ingredient_index, stb.) VÁLTOZATLAN marad!
-
-# =====================================================
-# 3. DEBUG ENDPOINT HOZZÁADÁSA (teszteléshez)
-# =====================================================
-
-@user_study_bp.route('/debug/similarity_test')
-def test_similarity():
-    """Similarity algoritmus tesztelése"""
-    result = "<h2>🧪 Similarity Algorithm Test</h2>"
-    
-    test_queries = [
-        "hagyma, paprika",
-        "csirke, burgonya", 
-        "tészta, paradicsom",
-        "gomba, tejföl"
-    ]
-    
-    for query in test_queries:
-        result += f"<h3>Keresés: '{query}'</h3>"
-        
-        try:
-            if recommender.hybrid_recommender:
-                # Test both methods
-                indices = recommender.hybrid_recommender.search_by_ingredients(query, max_results=5)
-                recipes = recommender.hybrid_recommender.recipes_df.iloc[indices]
-                
-                result += f"<p><strong>Találatok ({len(indices)}):</strong></p><ul>"
-                
-                for i, (idx, recipe) in enumerate(recipes.iterrows()):
-                    result += f"<li>{i+1}. {recipe.get('title', 'N/A')} <small>(ID: {idx})</small></li>"
-                
-                result += "</ul>"
-                
-                # Method info
-                vectorizer_type = "CountVectorizer" if recommender.hybrid_recommender.count_vectorizer else "TF-IDF"
-                result += f"<small>Használt módszer: {vectorizer_type}</small>"
-                
-            else:
-                result += "<p>❌ Hibrid ajánló nem elérhető</p>"
-                
-        except Exception as e:
-            result += f"<p>❌ Hiba: {e}</p>"
-        
-        result += "<hr>"
-    
-    return result
-
-# =====================================================
-# 4. IMPLEMENTÁCIÓS CHECKLIST
-# =====================================================
-
-SIMILARITY_UPGRADE_CHECKLIST = '''
-✅ SIMILARITY ALGORITMUS JAVÍTÁS CHECKLIST:
-
-1. [ ] Importok hozzáadása (CountVectorizer)
-2. [ ] HybridRecipeRecommender osztály cseréje
-3. [ ] _count_similarity_search() új metódus
-4. [ ] Debug endpoint hozzáadása
-5. [ ] Tesztelés: /debug/similarity_test
-6. [ ] Teljesítmény összehasonlítás (előtte/utána)
-7. [ ] User facing funkcionális teszt
-8. [ ] Error handling ellenőrzés
-9. [ ] Memory usage monitor
-10. [ ] Production deploy
-
-VÁRHATÓ JAVULÁSOK:
-- ✅ Jobb relevancia találatok
-- ✅ Gyorsabb keresés (binary CountVectorizer)
-- ✅ Kevesebb false positive
-- ✅ Robustusabb hibakezelés (fallback TF-IDF)
-'''
-
-print(SIMILARITY_UPGRADE_CHECKLIST)
 
 class EnhancedRecipeRecommender:
     """Hibrid recept ajánló rendszer - EGYSÉGES ALGORITMUS + A/B/C TESTING"""
@@ -1266,6 +1192,47 @@ def emergency_debug():
     except Exception as e:
         import traceback
         return f"<h1>TOTAL EMERGENCY ERROR:</h1><p>{e}</p><pre>{traceback.format_exc()}</pre>"
+@user_study_bp.route('/debug/similarity_test')
+def test_similarity():
+    """Similarity algoritmus tesztelése"""
+    result = "<h2>🧪 Similarity Algorithm Test</h2>"
+    
+    test_queries = [
+        "hagyma, paprika",
+        "csirke, burgonya", 
+        "tészta, paradicsom",
+        "gomba, tejföl"
+    ]
+    
+    for query in test_queries:
+        result += f"<h3>Keresés: '{query}'</h3>"
+        
+        try:
+            if recommender.hybrid_recommender:
+                # Test both methods
+                indices = recommender.hybrid_recommender.search_by_ingredients(query, max_results=5)
+                recipes = recommender.hybrid_recommender.recipes_df.iloc[indices]
+                
+                result += f"<p><strong>Találatok ({len(indices)}):</strong></p><ul>"
+                
+                for i, (idx, recipe) in enumerate(recipes.iterrows()):
+                    result += f"<li>{i+1}. {recipe.get('title', 'N/A')} <small>(ID: {idx})</small></li>"
+                
+                result += "</ul>"
+                
+                # Method info
+                vectorizer_type = "CountVectorizer" if recommender.hybrid_recommender.count_vectorizer else "TF-IDF"
+                result += f"<small>Használt módszer: {vectorizer_type}</small>"
+                
+            else:
+                result += "<p>❌ Hibrid ajánló nem elérhető</p>"
+                
+        except Exception as e:
+            result += f"<p>❌ Hiba: {e}</p>"
+        
+        result += "<hr>"
+    
+    return result
 
 # Export
 __all__ = ['user_study_bp']
