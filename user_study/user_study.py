@@ -86,6 +86,44 @@ class HybridRecipeRecommender:
         
         print(f"✅ {len(self.recipes_df)} recept feldolgozva hibrid filtering-hez")
     
+    def _clean_ingredients(self, ingredients_text):
+        """Összetevők szöveg tisztítása"""
+        if pd.isna(ingredients_text):
+            return ""
+        
+        # Alapvető tisztítás
+        text = str(ingredients_text).lower()
+        
+        # Magyar ékezetek normalizálása (opcionális)
+        replacements = {
+            'á': 'a', 'é': 'e', 'í': 'i', 'ó': 'o', 'ö': 'o', 
+            'ő': 'o', 'ú': 'u', 'ü': 'u', 'ű': 'u'
+        }
+        for old, new in replacements.items():
+            text = text.replace(old, new)
+        
+        # Felesleges karakterek eltávolítása
+        text = re.sub(r'[^\w\s,]', ' ', text)
+        text = re.sub(r'\s+', ' ', text)
+        
+        return text.strip()
+    
+    def _build_ingredient_index(self):
+        """Összetevő index építése gyors kereséshez"""
+        self.ingredient_index = {}
+        
+        for idx, ingredients in enumerate(self.recipes_df['ingredients_clean']):
+            # Összetevők szétválasztása
+            ingredient_list = [
+                ing.strip() for ing in ingredients.split(',') 
+                if ing.strip()
+            ]
+            
+            for ingredient in ingredient_list:
+                if ingredient not in self.ingredient_index:
+                    self.ingredient_index[ingredient] = []
+                self.ingredient_index[ingredient].append(idx)
+    
     def search_by_ingredients(self, search_ingredients, max_results=20):
         """Összetevő alapú keresés - JAVÍTOTT similarity"""
         if not search_ingredients.strip():
@@ -189,6 +227,85 @@ class HybridRecipeRecommender:
         except Exception as e:
             print(f"   ❌ TF-IDF search hiba: {e}")
             return []
+    
+    def _calculate_search_boost(self, recipes_df, search_ingredients):
+        """Keresési relevancia boost számítása"""
+        if not search_ingredients.strip():
+            return pd.Series([0.0] * len(recipes_df))
+        
+        search_terms = [term.strip().lower() for term in search_ingredients.split(',') if term.strip()]
+        boost_scores = []
+        
+        for _, recipe in recipes_df.iterrows():
+            recipe_ingredients = recipe['ingredients'].lower()
+            matches = sum(1 for term in search_terms if term in recipe_ingredients)
+            boost = (matches / len(search_terms)) * 100 if search_terms else 0
+            boost_scores.append(boost)
+        
+        return pd.Series(boost_scores, index=recipes_df.index)
+    
+    def _calculate_search_relevance(self, recipe, search_ingredients):
+        """Keresési relevancia számítása egy recepthez"""
+        if not search_ingredients.strip():
+            return 0.0
+        
+        search_terms = [term.strip().lower() for term in search_ingredients.split(',') if term.strip()]
+        recipe_ingredients = recipe['ingredients'].lower()
+        matches = sum(1 for term in search_terms if term in recipe_ingredients)
+        
+        return matches / len(search_terms) if search_terms else 0.0
+    
+    def _generate_explanation(self, recipe, search_ingredients=""):
+        """Magyarázat generálás V3 verzióhoz"""
+        explanations = []
+        
+        # Keresési relevancia magyarázat
+        if search_ingredients.strip():
+            relevance = recipe.get('search_relevance', 0)
+            if relevance >= 0.8:
+                explanations.append(f"🔍 Tökéletesen illeszkedik a keresett összetevőkhöz")
+            elif relevance >= 0.5:
+                explanations.append(f"🔍 Jól illeszkedik a kereséshez ({relevance:.0%})")
+            elif relevance > 0:
+                explanations.append(f"🔍 Részben tartalmazza a keresett összetevőket")
+        
+        # Score-alapú magyarázatok
+        env_score = recipe['ESI']
+        health_score = recipe['HSI'] 
+        pop_score = recipe['PPI']
+        
+        if env_score >= 70:
+            explanations.append(f"🌱 Környezetbarát ({env_score:.0f}/100 pont)")
+        if health_score >= 70:
+            explanations.append(f"💚 Egészséges ({health_score:.0f}/100 pont)")
+        if pop_score >= 70:
+            explanations.append(f"⭐ Népszerű ({pop_score:.0f}/100 pont)")
+        
+        if not explanations:
+            explanations.append("🍽️ Kiegyensúlyozott összetétel minden szempontból")
+        
+        # Összesített magyarázat kompozícióval
+        composite_score = env_score * 0.4 + health_score * 0.4 + pop_score * 0.2
+        
+        final_explanation = f"Ezt a receptet {composite_score:.1f}/100 összpontszám alapján ajánljuk "
+        final_explanation += f"(40% környezeti + 40% egészség + 20% népszerűség). "
+        final_explanation += " • ".join(explanations)
+        
+        return final_explanation
+    
+    def get_ingredient_suggestions(self, partial_input, max_suggestions=10):
+        """Összetevő javaslatok auto-complete-hez"""
+        if len(partial_input) < 2:
+            return []
+        
+        partial_clean = self._clean_ingredients(partial_input)
+        suggestions = []
+        
+        for ingredient in self.ingredient_index.keys():
+            if partial_clean in ingredient:
+                suggestions.append(ingredient)
+        
+        return sorted(suggestions)[:max_suggestions]
     
     def get_recommendations(self, version='v1', search_ingredients="", user_preferences=None, n_recommendations=5):
         """EGYSÉGES ajánlási algoritmus - csak információ megjelenítés különbözik"""
@@ -314,117 +431,117 @@ class EnhancedRecipeRecommender:
     
    # user_study.py - Cseréld ki a _fallback_recommendations metódust az EnhancedRecipeRecommender osztályban
 
-def _fallback_recommendations(self, version, n_recommendations):
-    """Fallback ajánlások ha a hibrid rendszer nem működik"""
-    print(f"⚠️ FALLBACK MODE: Generating {n_recommendations} sample recommendations for {version}")
-    
-    try:
-        # Ha van betöltött CSV, használjuk azt
-        if self.recipes_df is not None and len(self.recipes_df) > 0:
-            print(f"📊 Using CSV data: {len(self.recipes_df)} recipes available")
-            sample_size = min(n_recommendations, len(self.recipes_df))
-            recommendations = self.recipes_df.sample(n=sample_size).to_dict('records')
-        else:
-            # Ha nincs CSV, generálj sample adatokat
-            print("🔧 Generating hardcoded fallback recipes")
-            sample_recipes = [
-                {
-                    'recipeid': 1,
-                    'title': 'Hagyományos Gulyásleves',
-                    'ingredients': 'marhahús, hagyma, paprika, paradicsom, burgonya, fokhagyma, kömény, majoranna',
-                    'instructions': 'A húst kockákra vágjuk és enyhén megsózzuk. Megdinszteljük a hagymát, hozzáadjuk a paprikát. Felöntjük vízzel és főzzük 1.5 órát.',
-                    'images': 'https://images.unsplash.com/photo-1547592180-85f173990554?w=400&h=300&fit=crop',
-                    'HSI': 75.0, 'ESI': 60.0, 'PPI': 90.0, 'composite_score': 71.0
-                },
-                {
-                    'recipeid': 2,
-                    'title': 'Vegetáriánus Lecsó',
-                    'ingredients': 'paprika, paradicsom, hagyma, tojás, tofu, olívaolaj, só, bors, fokhagyma',
-                    'instructions': 'A hagymát és fokhagymát megdinszteljük olívaolajban. Hozzáadjuk a felszeletelt paprikát.',
-                    'images': 'https://images.unsplash.com/photo-1565299624946-b28f40a0ca4b?w=400&h=300&fit=crop',
-                    'HSI': 85.0, 'ESI': 80.0, 'PPI': 70.0, 'composite_score': 78.0
-                },
-                {
-                    'recipeid': 3,
-                    'title': 'Halászlé Szegedi Módra',
-                    'ingredients': 'ponty, csuka, harcsa, hagyma, paradicsom, paprika, só, babérlevél',
-                    'instructions': 'A halakat megtisztítjuk és feldaraboljuk. A halak fejéből és farkából erős alapot főzünk.',
-                    'images': 'https://images.unsplash.com/photo-1544943910-4c1dc44aab44?w=400&h=300&fit=crop',
-                    'HSI': 80.0, 'ESI': 70.0, 'PPI': 75.0, 'composite_score': 74.0
-                },
-                {
-                    'recipeid': 4,
-                    'title': 'Túrós Csusza',
-                    'ingredients': 'széles metélt, túró, tejföl, szalonna, hagyma, só, bors',
-                    'instructions': 'A tésztát sós vízben megfőzzük és leszűrjük. A szalonnát kockákra vágjuk és kisütjük.',
-                    'images': 'https://images.unsplash.com/photo-1551698618-1dfe5d97d256?w=400&h=300&fit=crop',
-                    'HSI': 65.0, 'ESI': 55.0, 'PPI': 80.0, 'composite_score': 65.0
-                },
-                {
-                    'recipeid': 5,
-                    'title': 'Gombapaprikás Galuskával',
-                    'ingredients': 'gomba, hagyma, paprika, tejföl, liszt, tojás, petrezselyem, olaj',
-                    'instructions': 'A gombát felszeleteljük és kisütjük. Hagymát dinsztelünk, paprikát adunk hozzá.',
-                    'images': 'https://images.unsplash.com/photo-1565299507177-b0ac66763828?w=400&h=300&fit=crop',
-                    'HSI': 70.0, 'ESI': 75.0, 'PPI': 65.0, 'composite_score': 70.0
-                }
-            ]
-            
-            # Válassz ki annyit amennyit kértek
-            recommendations = sample_recipes[:n_recommendations]
+    def _fallback_recommendations(self, version, n_recommendations):
+        """Fallback ajánlások ha a hibrid rendszer nem működik"""
+        print(f"⚠️ FALLBACK MODE: Generating {n_recommendations} sample recommendations for {version}")
         
-        # Verzió-specifikus információ hozzáadása MINDEN recepthez
-        for rec in recommendations:
-            # Biztosítsd hogy minden szükséges mező létezik
-            if 'HSI' not in rec:
-                rec['HSI'] = 70.0
-            if 'ESI' not in rec:
-                rec['ESI'] = 75.0
-            if 'PPI' not in rec:
-                rec['PPI'] = 80.0
-            if 'composite_score' not in rec:
-                rec['composite_score'] = (rec['ESI'] * 0.4 + rec['HSI'] * 0.4 + rec['PPI'] * 0.2)
+        try:
+            # Ha van betöltött CSV, használjuk azt
+            if self.recipes_df is not None and len(self.recipes_df) > 0:
+                print(f"📊 Using CSV data: {len(self.recipes_df)} recipes available")
+                sample_size = min(n_recommendations, len(self.recipes_df))
+                recommendations = self.recipes_df.sample(n=sample_size).to_dict('records')
+            else:
+                # Ha nincs CSV, generálj sample adatokat
+                print("🔧 Generating hardcoded fallback recipes")
+                sample_recipes = [
+                    {
+                        'recipeid': 1,
+                        'title': 'Hagyományos Gulyásleves',
+                        'ingredients': 'marhahús, hagyma, paprika, paradicsom, burgonya, fokhagyma, kömény, majoranna',
+                        'instructions': 'A húst kockákra vágjuk és enyhén megsózzuk. Megdinszteljük a hagymát, hozzáadjuk a paprikát. Felöntjük vízzel és főzzük 1.5 órát.',
+                        'images': 'https://images.unsplash.com/photo-1547592180-85f173990554?w=400&h=300&fit=crop',
+                        'HSI': 75.0, 'ESI': 60.0, 'PPI': 90.0, 'composite_score': 71.0
+                    },
+                    {
+                        'recipeid': 2,
+                        'title': 'Vegetáriánus Lecsó',
+                        'ingredients': 'paprika, paradicsom, hagyma, tojás, tofu, olívaolaj, só, bors, fokhagyma',
+                        'instructions': 'A hagymát és fokhagymát megdinszteljük olívaolajban. Hozzáadjuk a felszeletelt paprikát.',
+                        'images': 'https://images.unsplash.com/photo-1565299624946-b28f40a0ca4b?w=400&h=300&fit=crop',
+                        'HSI': 85.0, 'ESI': 80.0, 'PPI': 70.0, 'composite_score': 78.0
+                    },
+                    {
+                        'recipeid': 3,
+                        'title': 'Halászlé Szegedi Módra',
+                        'ingredients': 'ponty, csuka, harcsa, hagyma, paradicsom, paprika, só, babérlevél',
+                        'instructions': 'A halakat megtisztítjuk és feldaraboljuk. A halak fejéből és farkából erős alapot főzünk.',
+                        'images': 'https://images.unsplash.com/photo-1544943910-4c1dc44aab44?w=400&h=300&fit=crop',
+                        'HSI': 80.0, 'ESI': 70.0, 'PPI': 75.0, 'composite_score': 74.0
+                    },
+                    {
+                        'recipeid': 4,
+                        'title': 'Túrós Csusza',
+                        'ingredients': 'széles metélt, túró, tejföl, szalonna, hagyma, só, bors',
+                        'instructions': 'A tésztát sós vízben megfőzzük és leszűrjük. A szalonnát kockákra vágjuk és kisütjük.',
+                        'images': 'https://images.unsplash.com/photo-1551698618-1dfe5d97d256?w=400&h=300&fit=crop',
+                        'HSI': 65.0, 'ESI': 55.0, 'PPI': 80.0, 'composite_score': 65.0
+                    },
+                    {
+                        'recipeid': 5,
+                        'title': 'Gombapaprikás Galuskával',
+                        'ingredients': 'gomba, hagyma, paprika, tejföl, liszt, tojás, petrezselyem, olaj',
+                        'instructions': 'A gombát felszeleteljük és kisütjük. Hagymát dinsztelünk, paprikát adunk hozzá.',
+                        'images': 'https://images.unsplash.com/photo-1565299507177-b0ac66763828?w=400&h=300&fit=crop',
+                        'HSI': 70.0, 'ESI': 75.0, 'PPI': 65.0, 'composite_score': 70.0
+                    }
+                ]
+                
+                # Válassz ki annyit amennyit kértek
+                recommendations = sample_recipes[:n_recommendations]
             
-            # A/B/C testing verzió-specifikus megjelenítés
-            if version == 'v1':
-                rec['show_scores'] = False
-                rec['show_explanation'] = False
-                rec['explanation'] = ""
-            elif version == 'v2':
-                rec['show_scores'] = True
-                rec['show_explanation'] = False
-                rec['explanation'] = ""
-            elif version == 'v3':
-                rec['show_scores'] = True
-                rec['show_explanation'] = True
-                rec['explanation'] = f"Ezt a receptet {rec['composite_score']:.1f}/100 összpontszám alapján ajánljuk (40% környezeti + 40% egészség + 20% népszerűség). Fallback módban működik."
+            # Verzió-specifikus információ hozzáadása MINDEN recepthez
+            for rec in recommendations:
+                # Biztosítsd hogy minden szükséges mező létezik
+                if 'HSI' not in rec:
+                    rec['HSI'] = 70.0
+                if 'ESI' not in rec:
+                    rec['ESI'] = 75.0
+                if 'PPI' not in rec:
+                    rec['PPI'] = 80.0
+                if 'composite_score' not in rec:
+                    rec['composite_score'] = (rec['ESI'] * 0.4 + rec['HSI'] * 0.4 + rec['PPI'] * 0.2)
+                
+                # A/B/C testing verzió-specifikus megjelenítés
+                if version == 'v1':
+                    rec['show_scores'] = False
+                    rec['show_explanation'] = False
+                    rec['explanation'] = ""
+                elif version == 'v2':
+                    rec['show_scores'] = True
+                    rec['show_explanation'] = False
+                    rec['explanation'] = ""
+                elif version == 'v3':
+                    rec['show_scores'] = True
+                    rec['show_explanation'] = True
+                    rec['explanation'] = f"Ezt a receptet {rec['composite_score']:.1f}/100 összpontszám alapján ajánljuk (40% környezeti + 40% egészség + 20% népszerűség). Fallback módban működik."
+                
+                # Search relevance fallback
+                rec['search_relevance'] = 0.0
             
-            # Search relevance fallback
-            rec['search_relevance'] = 0.0
-        
-        print(f"✅ Fallback recommendations generated: {len(recommendations)} recipes for version {version}")
-        return recommendations
-        
-    except Exception as e:
-        print(f"❌ CRITICAL FALLBACK ERROR: {e}")
-        # Ultimate fallback - egyetlen minimal recept
-        minimal_recipe = {
-            'recipeid': 1,
-            'title': 'Alaprecept (Rendszer helyreállítás alatt)',
-            'ingredients': 'Alapösszetevők',
-            'instructions': 'Alapinstrukciók',
-            'images': 'https://via.placeholder.com/400x300/cccccc/666666?text=Recipe',
-            'HSI': 70.0,
-            'ESI': 70.0,
-            'PPI': 70.0,
-            'composite_score': 70.0,
-            'show_scores': version != 'v1',
-            'show_explanation': version == 'v3',
-            'explanation': 'Rendszer helyreállítás alatt.' if version == 'v3' else '',
-            'search_relevance': 0.0
-        }
-        return [minimal_recipe]
-        return []
+            print(f"✅ Fallback recommendations generated: {len(recommendations)} recipes for version {version}")
+            return recommendations
+            
+        except Exception as e:
+            print(f"❌ CRITICAL FALLBACK ERROR: {e}")
+            # Ultimate fallback - egyetlen minimal recept
+            minimal_recipe = {
+                'recipeid': 1,
+                'title': 'Alaprecept (Rendszer helyreállítás alatt)',
+                'ingredients': 'Alapösszetevők',
+                'instructions': 'Alapinstrukciók',
+                'images': 'https://via.placeholder.com/400x300/cccccc/666666?text=Recipe',
+                'HSI': 70.0,
+                'ESI': 70.0,
+                'PPI': 70.0,
+                'composite_score': 70.0,
+                'show_scores': version != 'v1',
+                'show_explanation': version == 'v3',
+                'explanation': 'Rendszer helyreállítás alatt.' if version == 'v3' else '',
+                'search_relevance': 0.0
+            }
+            return [minimal_recipe]
+            return []
 
 # Global objektumok
 db = UserStudyDatabase()
