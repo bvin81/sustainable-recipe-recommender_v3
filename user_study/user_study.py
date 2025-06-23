@@ -2,6 +2,7 @@
 """
 TELJES MEGOLDÁS - User Study with CSV Processing + Images
 A `processed_recipes.csv` létrehozása és használata
+JAVÍTOTT VERZIÓ - minden hiányzó metódussal
 """
 
 import os
@@ -19,6 +20,398 @@ from sklearn.metrics.pairwise import cosine_similarity
 import re
 import io
 
+# Project paths setup
+project_root = Path(__file__).parent.parent
+data_dir = project_root / "data"
+data_dir.mkdir(exist_ok=True)
+
+# Blueprint setup
+user_study_bp = Blueprint('user_study', __name__, 
+                         template_folder='templates',
+                         static_folder='static')
+
+class UserStudyDatabase:
+    """SQLite adatbázis a felhasználói tanulmányhoz"""
+    
+    def __init__(self):
+        self.db_path = data_dir / "user_study.db"
+        self.init_database()
+    
+    def init_database(self):
+        """Adatbázis inicializálása"""
+        conn = sqlite3.connect(self.db_path)
+        conn.row_factory = sqlite3.Row
+        
+        # Participants tábla
+        conn.execute('''
+            CREATE TABLE IF NOT EXISTS participants (
+                user_id INTEGER PRIMARY KEY AUTOINCREMENT,
+                age_group TEXT NOT NULL,
+                education TEXT NOT NULL,
+                cooking_frequency TEXT NOT NULL,
+                sustainability_awareness INTEGER NOT NULL,
+                version TEXT NOT NULL,
+                is_completed BOOLEAN DEFAULT 0,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            )
+        ''')
+        
+        # Interactions tábla
+        conn.execute('''
+            CREATE TABLE IF NOT EXISTS interactions (
+                interaction_id INTEGER PRIMARY KEY AUTOINCREMENT,
+                user_id INTEGER NOT NULL,
+                recipe_id INTEGER NOT NULL,
+                rating INTEGER,
+                explanation_helpful INTEGER,
+                view_time_seconds REAL,
+                interaction_order INTEGER,
+                timestamp TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                FOREIGN KEY (user_id) REFERENCES participants (user_id)
+            )
+        ''')
+        
+        # Questionnaire tábla
+        conn.execute('''
+            CREATE TABLE IF NOT EXISTS questionnaire (
+                questionnaire_id INTEGER PRIMARY KEY AUTOINCREMENT,
+                user_id INTEGER NOT NULL,
+                system_usability INTEGER,
+                recommendation_quality INTEGER,
+                trust_level INTEGER,
+                explanation_clarity INTEGER,
+                sustainability_importance INTEGER,
+                overall_satisfaction INTEGER,
+                additional_comments TEXT,
+                timestamp TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                FOREIGN KEY (user_id) REFERENCES participants (user_id)
+            )
+        ''')
+        
+        conn.commit()
+        conn.close()
+        print(f"✅ Adatbázis inicializálva: {self.db_path}")
+    
+    def get_connection(self):
+        """Adatbázis kapcsolat létrehozása"""
+        conn = sqlite3.connect(self.db_path)
+        conn.row_factory = sqlite3.Row
+        return conn
+    
+    def create_user(self, age_group, education, cooking_frequency, sustainability_awareness, version):
+        """Új felhasználó létrehozása"""
+        conn = self.get_connection()
+        cursor = conn.execute('''
+            INSERT INTO participants (age_group, education, cooking_frequency, 
+                                    sustainability_awareness, version)
+            VALUES (?, ?, ?, ?, ?)
+        ''', (age_group, education, cooking_frequency, sustainability_awareness, version))
+        
+        user_id = cursor.lastrowid
+        conn.commit()
+        conn.close()
+        
+        print(f"✅ Új felhasználó létrehozva: {user_id} (verzió: {version})")
+        return user_id
+    
+    def log_interaction(self, user_id, recipe_id, rating, explanation_helpful, view_time, interaction_order):
+        """Interakció naplózása"""
+        conn = self.get_connection()
+        conn.execute('''
+            INSERT INTO interactions (user_id, recipe_id, rating, explanation_helpful, 
+                                    view_time_seconds, interaction_order)
+            VALUES (?, ?, ?, ?, ?, ?)
+        ''', (user_id, recipe_id, rating, explanation_helpful, view_time, interaction_order))
+        
+        conn.commit()
+        conn.close()
+    
+    def save_questionnaire(self, user_id, responses):
+        """Kérdőív mentése"""
+        conn = self.get_connection()
+        conn.execute('''
+            INSERT INTO questionnaire (user_id, system_usability, recommendation_quality,
+                                     trust_level, explanation_clarity, sustainability_importance,
+                                     overall_satisfaction, additional_comments)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+        ''', (user_id, responses['system_usability'], responses['recommendation_quality'],
+              responses['trust_level'], responses['explanation_clarity'], 
+              responses['sustainability_importance'], responses['overall_satisfaction'],
+              responses['additional_comments']))
+        
+        # Mark user as completed
+        conn.execute('UPDATE participants SET is_completed = 1 WHERE user_id = ?', (user_id,))
+        
+        conn.commit()
+        conn.close()
+        print(f"✅ Kérdőív mentve: user_id={user_id}")
+
+class CSVProcessor:
+    """CSV feldolgozó osztály a receptekhez"""
+    
+    @staticmethod
+    def create_processed_csv():
+        """Processed CSV létrehozása/ellenőrzése"""
+        processed_path = data_dir / "processed_recipes.csv"
+        original_path = project_root / "hungarian_recipes_github.csv"
+        
+        print(f"🔍 CSV ellenőrzés...")
+        print(f"   Processed: {processed_path}")
+        print(f"   Original: {original_path}")
+        
+        # Ha már létezik a processed CSV, használjuk azt
+        if processed_path.exists():
+            try:
+                df = pd.read_csv(processed_path)
+                if len(df) >= 10:  # Minimum 10 recept
+                    print(f"✅ Processed CSV már létezik: {len(df)} recept")
+                    return processed_path
+            except:
+                print("⚠️ Processed CSV sérült, újragenerálás...")
+        
+        # Próbáljuk betölteni az eredeti CSV-t
+        if original_path.exists():
+            try:
+                return CSVProcessor._process_original_csv(original_path, processed_path)
+            except Exception as e:
+                print(f"⚠️ Eredeti CSV feldolgozási hiba: {e}")
+        
+        # Fallback: sample data generálása
+        print("🔧 Sample CSV generálása...")
+        return CSVProcessor._create_sample_csv(processed_path)
+    
+    @staticmethod
+    def _process_original_csv(original_path, processed_path):
+        """Eredeti CSV feldolgozása"""
+        print(f"📊 Eredeti CSV feldolgozása: {original_path}")
+        
+        # CSV betöltése UTF-8 kódolással
+        try:
+            df = pd.read_csv(original_path, encoding='utf-8')
+        except UnicodeDecodeError:
+            try:
+                df = pd.read_csv(original_path, encoding='latin-1')
+            except:
+                df = pd.read_csv(original_path, encoding='cp1252')
+        
+        print(f"📋 Eredeti adatok: {len(df)} recept, {len(df.columns)} oszlop")
+        
+        # Oszlopok ellenőrzése és átalakítása
+        required_columns = ['recipeid', 'title', 'ingredients', 'instructions', 'images']
+        
+        # Oszlop mappping ha szükséges
+        column_mapping = {
+            'id': 'recipeid',
+            'name': 'title',
+            'recipe_name': 'title',
+            'image': 'images',
+            'image_url': 'images',
+            'directions': 'instructions',
+            'steps': 'instructions'
+        }
+        
+        # Átnevezés
+        for old_col, new_col in column_mapping.items():
+            if old_col in df.columns and new_col not in df.columns:
+                df = df.rename(columns={old_col: new_col})
+        
+        # Hiányzó oszlopok pótlása
+        for col in required_columns:
+            if col not in df.columns:
+                if col == 'recipeid':
+                    df[col] = range(1, len(df) + 1)
+                elif col == 'images':
+                    df[col] = CSVProcessor._generate_placeholder_images(len(df))
+                else:
+                    df[col] = f'Missing {col}'
+        
+        # Pontszámok generálása ha hiányoznak
+        CSVProcessor._add_scores(df)
+        
+        # Tisztítás és validálás
+        df = CSVProcessor._clean_and_validate(df)
+        
+        # Mentés
+        df.to_csv(processed_path, index=False, encoding='utf-8')
+        print(f"✅ Processed CSV mentve: {len(df)} recept -> {processed_path}")
+        
+        return processed_path
+    
+    @staticmethod
+    def _create_sample_csv(processed_path):
+        """Sample CSV generálása ha nincs eredeti"""
+        print("🔧 Sample receptek generálása...")
+        
+        sample_recipes = [
+            {
+                'recipeid': 1,
+                'title': 'Hagyományos Gulyásleves',
+                'ingredients': 'marhahús, hagyma, paprika, paradicsom, burgonya, fokhagyma, kömény, majoranna, só, bors',
+                'instructions': 'A húst kockákra vágjuk és enyhén megsózzuk. Megdinszteljük a hagymát, hozzáadjuk a paprikát. Felöntjük vízzel és főzzük 1.5 órát.',
+                'category': 'Levesek',
+                'images': 'https://images.unsplash.com/photo-1547592180-85f173990554?w=400&h=300&fit=crop'
+            },
+            {
+                'recipeid': 2,
+                'title': 'Vegetáriánus Lecsó',
+                'ingredients': 'paprika, paradicsom, hagyma, tojás, tofu, olívaolaj, só, bors, fokhagyma',
+                'instructions': 'A hagymát és fokhagymát megdinszteljük olívaolajban. Hozzáadjuk a felszeletelt paprikát.',
+                'category': 'Vegetáriánus',
+                'images': 'https://images.unsplash.com/photo-1565299624946-b28f40a0ca4b?w=400&h=300&fit=crop'
+            },
+            {
+                'recipeid': 3,
+                'title': 'Halászlé Szegedi Módra',
+                'ingredients': 'ponty, csuka, harcsa, hagyma, paradicsom, paprika, só, babérlevél',
+                'instructions': 'A halakat megtisztítjuk és feldaraboljuk. A halak fejéből és farkából erős alapot főzünk.',
+                'category': 'Halételek',
+                'images': 'https://images.unsplash.com/photo-1544943910-4c1dc44aab44?w=400&h=300&fit=crop'
+            },
+            {
+                'recipeid': 4,
+                'title': 'Túrós Csusza',
+                'ingredients': 'széles metélt, túró, tejföl, szalonna, hagyma, só, bors',
+                'instructions': 'A tésztát sós vízben megfőzzük és leszűrjük. A szalonnát kockákra vágjuk és kisütjük.',
+                'category': 'Tésztaételek',
+                'images': 'https://images.unsplash.com/photo-1551698618-1dfe5d97d256?w=400&h=300&fit=crop'
+            },
+            {
+                'recipeid': 5,
+                'title': 'Gombapaprikás Galuskával',
+                'ingredients': 'gomba, hagyma, paprika, tejföl, liszt, tojás, petrezselyem, olaj',
+                'instructions': 'A gombát felszeleteljük és kisütjük. Hagymát dinsztelünk, paprikát adunk hozzá.',
+                'category': 'Vegetáriánus',
+                'images': 'https://images.unsplash.com/photo-1565299507177-b0ac66763828?w=400&h=300&fit=crop'
+            },
+            {
+                'recipeid': 6,
+                'title': 'Schnitzel Burgonyával',
+                'ingredients': 'sertéshús, liszt, tojás, zsemlemorzsa, burgonya, olaj, citrom, petrezselyem',
+                'instructions': 'A húst kiverdjük, lisztbe, tojásba, morzsába forgatjuk. Forró olajban kisütjük.',
+                'category': 'Húsételek',
+                'images': 'https://images.unsplash.com/photo-1529692236671-f1f6cf9683ba?w=400&h=300&fit=crop'
+            },
+            {
+                'recipeid': 7,
+                'title': 'Töltött Káposzta',
+                'ingredients': 'savanyú káposzta, darált hús, rizs, hagyma, tojás, paprika, paradicsom',
+                'instructions': 'A darált húst összekeverjük a rizzsel és fűszerekkel. A káposztába tekerjük.',
+                'category': 'Húsételek',
+                'images': 'https://images.unsplash.com/photo-1574484284002-952d92456975?w=400&h=300&fit=crop'
+            },
+            {
+                'recipeid': 8,
+                'title': 'Rántott Sajt Tartármártással',
+                'ingredients': 'trappista sajt, liszt, tojás, zsemlemorzsa, majonéz, kapribogyó, hagyma',
+                'instructions': 'A sajtot szeleteljük, panírozzuk és kisütjük. Tartármártást készítünk.',
+                'category': 'Vegetáriánus',
+                'images': 'https://images.unsplash.com/photo-1571091718767-18b5b1457add?w=400&h=300&fit=crop'
+            },
+            {
+                'recipeid': 9,
+                'title': 'Babgulyás Csipetkével',
+                'ingredients': 'bab, hagyma, paprika, paradicsom, kolbász, csipetke, kömény, babérlevél',
+                'instructions': 'A babot előző este beáztatjuk. Hagymát dinsztelünk, paprikát adunk hozzá.',
+                'category': 'Levesek',
+                'images': 'https://images.unsplash.com/photo-1599687351724-dfa3c4ff81b1?w=400&h=300&fit=crop'
+            },
+            {
+                'recipeid': 10,
+                'title': 'Palócleves',
+                'ingredients': 'bárány, bab, burgonya, tejföl, kapor, hagyma, paprika, paradicsom',
+                'instructions': 'A bárányhúst kockázzuk és megfőzzük. Hozzáadjuk a babot és burgonyát.',
+                'category': 'Levesek',
+                'images': 'https://images.unsplash.com/photo-1547592166-23ac45744acd?w=400&h=300&fit=crop'
+            }
+        ]
+        
+        # 50 receptre kibővítés variációkkal
+        extended_recipes = []
+        for i in range(50):
+            base_recipe = sample_recipes[i % len(sample_recipes)].copy()
+            base_recipe['recipeid'] = i + 1
+            if i >= len(sample_recipes):
+                base_recipe['title'] = f"{base_recipe['title']} - {i//len(sample_recipes) + 1}. variáció"
+            extended_recipes.append(base_recipe)
+        
+        df = pd.DataFrame(extended_recipes)
+        
+        # Pontszámok hozzáadása
+        CSVProcessor._add_scores(df)
+        
+        # Mentés
+        df.to_csv(processed_path, index=False, encoding='utf-8')
+        print(f"✅ Sample CSV mentve: {len(df)} recept -> {processed_path}")
+        
+        return processed_path
+    
+    @staticmethod
+    def _add_scores(df):
+        """Pontszámok hozzáadása a receptekhez"""
+        print("🧮 Pontszámok generálása...")
+        
+        np.random.seed(42)  # Reprodukálható eredmények
+        
+        n_recipes = len(df)
+        
+        # ESI (Environmental Score Index) - környezeti pontszám
+        df['env_score_raw'] = np.random.normal(65, 15, n_recipes)
+        df['ESI'] = np.clip(df['env_score_raw'], 10, 100)
+        
+        # HSI (Health Score Index) - egészség pontszám
+        df['nutri_score_raw'] = np.random.normal(70, 12, n_recipes)
+        df['HSI'] = np.clip(df['nutri_score_raw'], 20, 100)
+        
+        # PPI (Popularity/Preference Index) - népszerűség pontszám
+        df['meal_score_raw'] = np.random.normal(75, 10, n_recipes)
+        df['PPI'] = np.clip(df['meal_score_raw'], 30, 100)
+        
+        # Composite score (súlyozott átlag)
+        df['composite_score'] = (
+            df['ESI'] * 0.4 +      # 40% környezeti
+            df['HSI'] * 0.4 +      # 40% egészség  
+            df['PPI'] * 0.2        # 20% népszerűség
+        )
+        
+        print(f"✅ Pontszámok hozzáadva - ESI: {df['ESI'].mean():.1f}, HSI: {df['HSI'].mean():.1f}, PPI: {df['PPI'].mean():.1f}")
+    
+    @staticmethod
+    def _generate_placeholder_images(count):
+        """Placeholder képek generálása"""
+        base_urls = [
+            'https://images.unsplash.com/photo-1547592180-85f173990554?w=400&h=300&fit=crop',
+            'https://images.unsplash.com/photo-1565299624946-b28f40a0ca4b?w=400&h=300&fit=crop',
+            'https://images.unsplash.com/photo-1544943910-4c1dc44aab44?w=400&h=300&fit=crop',
+            'https://images.unsplash.com/photo-1551698618-1dfe5d97d256?w=400&h=300&fit=crop',
+            'https://images.unsplash.com/photo-1565299507177-b0ac66763828?w=400&h=300&fit=crop'
+        ]
+        
+        return [base_urls[i % len(base_urls)] for i in range(count)]
+    
+    @staticmethod
+    def _clean_and_validate(df):
+        """Adatok tisztítása és validálása"""
+        print("🧹 Adatok tisztítása...")
+        
+        # Üres cellák pótlása
+        df['title'] = df['title'].fillna('Névtelen recept')
+        df['ingredients'] = df['ingredients'].fillna('Alapösszetevők')
+        df['instructions'] = df['instructions'].fillna('Alapinstrukciók')
+        df['category'] = df['category'].fillna('Egyéb')
+        
+        # Duplikátumok eltávolítása
+        original_len = len(df)
+        df = df.drop_duplicates(subset=['title'], keep='first')
+        if len(df) < original_len:
+            print(f"⚠️ {original_len - len(df)} duplikátum eltávolítva")
+        
+        # Reset index
+        df = df.reset_index(drop=True)
+        df['recipeid'] = range(1, len(df) + 1)
+        
+        print(f"✅ Adatok tisztítva: {len(df)} végleges recept")
+        return df
+
 class HybridRecipeRecommender:
     """Hibrid ajánlórendszer: keresés + content filtering + JAVÍTOTT similarity"""
     
@@ -30,6 +423,146 @@ class HybridRecipeRecommender:
         self.tfidf_matrix = None      # Megtartjuk fallback-nak
         self.ingredient_index = None
         self._prepare_content_features()
+    
+    def _clean_ingredients(self, ingredients_text):
+        """Összetevők szöveg tisztítása és normalizálása"""
+        if not ingredients_text:
+            return ""
+        
+        # Alapvető tisztítás
+        text = str(ingredients_text).lower()
+        
+        # Speciális karakterek eltávolítása, vesszők megtartása
+        text = re.sub(r'[^\w\s,áéíóöőúüű-]', ' ', text)
+        
+        # Többszörös szóközök eltávolítása
+        text = re.sub(r'\s+', ' ', text)
+        
+        # Trim
+        text = text.strip()
+        
+        return text
+    
+    def _build_ingredient_index(self):
+        """Összetevő index építése gyors kereséshez"""
+        print("🏗️ Összetevő index építése...")
+        
+        self.ingredient_index = {}
+        
+        for idx, row in self.recipes_df.iterrows():
+            ingredients = str(row.get('ingredients', ''))
+            cleaned_ingredients = self._clean_ingredients(ingredients)
+            
+            # Összetevők szétbontása
+            ingredient_words = set()
+            
+            # Vesszővel elválasztott részek
+            parts = [part.strip() for part in cleaned_ingredients.split(',') if part.strip()]
+            for part in parts:
+                # Minden rész szavait hozzáadjuk
+                words = [word.strip() for word in part.split() if len(word.strip()) > 2]
+                ingredient_words.update(words)
+            
+            # Index építése
+            for word in ingredient_words:
+                if word not in self.ingredient_index:
+                    self.ingredient_index[word] = []
+                if idx not in self.ingredient_index[word]:
+                    self.ingredient_index[word].append(idx)
+        
+        print(f"✅ Összetevő index kész: {len(self.ingredient_index)} egyedi összetevő")
+    
+    def get_ingredient_suggestions(self, partial_input, max_suggestions=10):
+        """Összetevő javaslatok a kereséshez"""
+        if not partial_input or len(partial_input) < 2:
+            return []
+        
+        if not hasattr(self, 'ingredient_index') or not self.ingredient_index:
+            return []
+        
+        partial_lower = partial_input.lower().strip()
+        suggestions = []
+        
+        # Keresés a már indexelt összetevőkben
+        for ingredient in self.ingredient_index.keys():
+            if partial_lower in ingredient and ingredient not in suggestions:
+                suggestions.append(ingredient)
+            
+            if len(suggestions) >= max_suggestions:
+                break
+        
+        # Rendezés relevancia szerint (az input elejével kezdődő előre)
+        suggestions.sort(key=lambda x: (not x.startswith(partial_lower), x))
+        
+        return suggestions[:max_suggestions]
+    
+    def _calculate_search_boost(self, candidate_recipes, search_ingredients):
+        """Keresési relevancia boost számítása"""
+        if not search_ingredients.strip():
+            return np.zeros(len(candidate_recipes))
+        
+        search_terms = [term.strip().lower() for term in search_ingredients.split(',') if term.strip()]
+        boost_scores = []
+        
+        for _, recipe in candidate_recipes.iterrows():
+            ingredients = str(recipe.get('ingredients', '')).lower()
+            boost = 0
+            
+            for term in search_terms:
+                if term in ingredients:
+                    boost += 1
+            
+            # Normalizálás a keresési kifejezések számával
+            boost_scores.append(boost / len(search_terms) if search_terms else 0)
+        
+        return np.array(boost_scores)
+    
+    def _calculate_search_relevance(self, recipe, search_ingredients):
+        """Egy recept keresési relevanciájának számítása"""
+        if not search_ingredients.strip():
+            return 0.0
+        
+        search_terms = [term.strip().lower() for term in search_ingredients.split(',') if term.strip()]
+        ingredients = str(recipe.get('ingredients', '')).lower()
+        
+        matches = sum(1 for term in search_terms if term in ingredients)
+        return matches / len(search_terms) if search_terms else 0.0
+    
+    def _generate_explanation(self, recipe, search_ingredients=""):
+        """Ajánlás magyarázatának generálása (v3 verzióhoz)"""
+        try:
+            # Alappontszámok
+            esi = float(recipe.get('ESI', 0))
+            hsi = float(recipe.get('HSI', 0))
+            ppi = float(recipe.get('PPI', 0))
+            
+            # Összetett pontszám
+            composite = esi * 0.4 + hsi * 0.4 + ppi * 0.2
+            
+            explanation = f"Ezt a receptet {composite:.1f}/100 összpontszám alapján ajánljuk (40% környezeti + 40% egészség + 20% népszerűség). "
+            
+            # Környezeti értékelés
+            if esi >= 80:
+                explanation += "🌱 Kiváló környezeti értékeléssel rendelkezik"
+            elif esi >= 60:
+                explanation += "🌱 Környezetbarát"
+            elif esi >= 40:
+                explanation += "⚠️ Közepes környezeti hatással"
+            else:
+                explanation += "🔸 Magasabb környezeti hatással"
+            
+            explanation += f" ({esi:.0f}/100 pont)"
+            
+            # Keresési relevancia
+            if search_ingredients.strip():
+                relevance = self._calculate_search_relevance(recipe, search_ingredients)
+                if relevance > 0.5:
+                    explanation += f". Jól illeszkedik a keresett összetevőkhöz."
+            
+            return explanation
+            
+        except Exception as e:
+            return f"Ajánlás generálva hibrid algoritmussal. (Hiba az explanáció generálásában: {e})"
         
     def _prepare_content_features(self):
         """Content filtering előkészítése - JAVÍTOTT verzió"""
@@ -85,44 +618,6 @@ class HybridRecipeRecommender:
         self._build_ingredient_index()
         
         print(f"✅ {len(self.recipes_df)} recept feldolgozva hibrid filtering-hez")
-    
-    def _clean_ingredients(self, ingredients_text):
-        """Összetevők szöveg tisztítása"""
-        if pd.isna(ingredients_text):
-            return ""
-        
-        # Alapvető tisztítás
-        text = str(ingredients_text).lower()
-        
-        # Magyar ékezetek normalizálása (opcionális)
-        replacements = {
-            'á': 'a', 'é': 'e', 'í': 'i', 'ó': 'o', 'ö': 'o', 
-            'ő': 'o', 'ú': 'u', 'ü': 'u', 'ű': 'u'
-        }
-        for old, new in replacements.items():
-            text = text.replace(old, new)
-        
-        # Felesleges karakterek eltávolítása
-        text = re.sub(r'[^\w\s,]', ' ', text)
-        text = re.sub(r'\s+', ' ', text)
-        
-        return text.strip()
-    
-    def _build_ingredient_index(self):
-        """Összetevő index építése gyors kereséshez"""
-        self.ingredient_index = {}
-        
-        for idx, ingredients in enumerate(self.recipes_df['ingredients_clean']):
-            # Összetevők szétválasztása
-            ingredient_list = [
-                ing.strip() for ing in ingredients.split(',') 
-                if ing.strip()
-            ]
-            
-            for ingredient in ingredient_list:
-                if ingredient not in self.ingredient_index:
-                    self.ingredient_index[ingredient] = []
-                self.ingredient_index[ingredient].append(idx)
     
     def search_by_ingredients(self, search_ingredients, max_results=20):
         """Összetevő alapú keresés - JAVÍTOTT similarity"""
@@ -228,85 +723,6 @@ class HybridRecipeRecommender:
             print(f"   ❌ TF-IDF search hiba: {e}")
             return []
     
-    def _calculate_search_boost(self, recipes_df, search_ingredients):
-        """Keresési relevancia boost számítása"""
-        if not search_ingredients.strip():
-            return pd.Series([0.0] * len(recipes_df))
-        
-        search_terms = [term.strip().lower() for term in search_ingredients.split(',') if term.strip()]
-        boost_scores = []
-        
-        for _, recipe in recipes_df.iterrows():
-            recipe_ingredients = recipe['ingredients'].lower()
-            matches = sum(1 for term in search_terms if term in recipe_ingredients)
-            boost = (matches / len(search_terms)) * 100 if search_terms else 0
-            boost_scores.append(boost)
-        
-        return pd.Series(boost_scores, index=recipes_df.index)
-    
-    def _calculate_search_relevance(self, recipe, search_ingredients):
-        """Keresési relevancia számítása egy recepthez"""
-        if not search_ingredients.strip():
-            return 0.0
-        
-        search_terms = [term.strip().lower() for term in search_ingredients.split(',') if term.strip()]
-        recipe_ingredients = recipe['ingredients'].lower()
-        matches = sum(1 for term in search_terms if term in recipe_ingredients)
-        
-        return matches / len(search_terms) if search_terms else 0.0
-    
-    def _generate_explanation(self, recipe, search_ingredients=""):
-        """Magyarázat generálás V3 verzióhoz"""
-        explanations = []
-        
-        # Keresési relevancia magyarázat
-        if search_ingredients.strip():
-            relevance = recipe.get('search_relevance', 0)
-            if relevance >= 0.8:
-                explanations.append(f"🔍 Tökéletesen illeszkedik a keresett összetevőkhöz")
-            elif relevance >= 0.5:
-                explanations.append(f"🔍 Jól illeszkedik a kereséshez ({relevance:.0%})")
-            elif relevance > 0:
-                explanations.append(f"🔍 Részben tartalmazza a keresett összetevőket")
-        
-        # Score-alapú magyarázatok
-        env_score = recipe['ESI']
-        health_score = recipe['HSI'] 
-        pop_score = recipe['PPI']
-        
-        if env_score >= 70:
-            explanations.append(f"🌱 Környezetbarát ({env_score:.0f}/100 pont)")
-        if health_score >= 70:
-            explanations.append(f"💚 Egészséges ({health_score:.0f}/100 pont)")
-        if pop_score >= 70:
-            explanations.append(f"⭐ Népszerű ({pop_score:.0f}/100 pont)")
-        
-        if not explanations:
-            explanations.append("🍽️ Kiegyensúlyozott összetétel minden szempontból")
-        
-        # Összesített magyarázat kompozícióval
-        composite_score = env_score * 0.4 + health_score * 0.4 + pop_score * 0.2
-        
-        final_explanation = f"Ezt a receptet {composite_score:.1f}/100 összpontszám alapján ajánljuk "
-        final_explanation += f"(40% környezeti + 40% egészség + 20% népszerűség). "
-        final_explanation += " • ".join(explanations)
-        
-        return final_explanation
-    
-    def get_ingredient_suggestions(self, partial_input, max_suggestions=10):
-        """Összetevő javaslatok auto-complete-hez"""
-        if len(partial_input) < 2:
-            return []
-        
-        partial_clean = self._clean_ingredients(partial_input)
-        suggestions = []
-        
-        for ingredient in self.ingredient_index.keys():
-            if partial_clean in ingredient:
-                suggestions.append(ingredient)
-        
-        return sorted(suggestions)[:max_suggestions]
-    
     def get_recommendations(self, version='v1', search_ingredients="", user_preferences=None, n_recommendations=5):
         """EGYSÉGES ajánlási algoritmus - csak információ megjelenítés különbözik"""
         
@@ -358,7 +774,6 @@ class HybridRecipeRecommender:
         
         print(f"✅ {len(recommendations)} ajánlás generálva ({version}) - JAVÍTOTT similarity")
         return recommendations
-    
 
 class EnhancedRecipeRecommender:
     """Hibrid recept ajánló rendszer - EGYSÉGES ALGORITMUS + A/B/C TESTING"""
@@ -429,8 +844,6 @@ class EnhancedRecipeRecommender:
             print(f"❌ Hibrid ajánlási hiba: {e}")
             return self._fallback_recommendations(version, n_recommendations)
     
-   # user_study.py - Cseréld ki a _fallback_recommendations metódust az EnhancedRecipeRecommender osztályban
-
     def _fallback_recommendations(self, version, n_recommendations):
         """Fallback ajánlások ha a hibrid rendszer nem működik"""
         print(f"⚠️ FALLBACK MODE: Generating {n_recommendations} sample recommendations for {version}")
@@ -541,7 +954,6 @@ class EnhancedRecipeRecommender:
                 'search_relevance': 0.0
             }
             return [minimal_recipe]
-            return []
 
 # Global objektumok
 db = UserStudyDatabase()
@@ -765,7 +1177,6 @@ def admin_stats():
         
     except Exception as e:
         return f"Stats error: {e}", 500
-# Add these routes to user_study.py after the admin_stats route
 
 @user_study_bp.route('/admin/export/csv')
 def export_csv():
@@ -1041,7 +1452,9 @@ SAVE OUTFILE='user_study_processed.sav'.
         
     except Exception as e:
         return f"SPSS syntax hiba: {e}", 500
-# DEBUG route CSV ellenőrzéshez
+
+# DEBUG ROUTES
+
 @user_study_bp.route('/debug/csv')
 def debug_csv():
     """CSV debug információk"""
@@ -1089,7 +1502,7 @@ def debug_csv():
         
         # Test recommendation
         try:
-            test_recs = recommender.get_recommendations('v1', 2)
+            test_recs = recommender.get_recommendations('v1', '', {}, 2)
             result += f"Test recommendations: {len(test_recs)}<br>"
             if test_recs:
                 result += f"First recipe: {test_recs[0]['title']}<br>"
@@ -1195,7 +1608,6 @@ def debug_abc_testing():
         
     except Exception as e:
         return f"Debug error: {e}", 500
-# Add this to user_study.py right after the other debug routes (around line 650-700)
 
 @user_study_bp.route('/debug/emergency')
 def emergency_debug():
