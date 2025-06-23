@@ -1192,6 +1192,8 @@ def emergency_debug():
     except Exception as e:
         import traceback
         return f"<h1>TOTAL EMERGENCY ERROR:</h1><p>{e}</p><pre>{traceback.format_exc()}</pre>"
+
+
 @user_study_bp.route('/debug/similarity_test')
 def test_similarity():
     """Similarity algoritmus tesztelése"""
