@@ -13,14 +13,17 @@ import json
 import pandas as pd
 import psycopg2
 from psycopg2.extras import RealDictCursor
+from . import DATABASE_URL, EXPORT_DIR, TIMESTAMP_FORMAT
 from datetime import datetime
 import numpy as np
 
 class GreenRecDataExporter:
-    def __init__(self, database_url=None):
-        self.database_url = database_url or os.environ.get('DATABASE_URL')
-        if self.database_url and self.database_url.startswith('postgres://'):
-            self.database_url = self.database_url.replace('postgres://', 'postgresql://', 1)
+    def __init__(self):
+        self.database_url = DATABASE_URL  # ✅ Közös konfig
+        self.output_dir = EXPORT_DIR      # ✅ Konzisztens mappanév
+    
+    def export_all_data(self):
+        timestamp = datetime.now().strftime(TIMESTAMP_FORMAT)
     
     def get_connection(self):
         """PostgreSQL kapcsolat létrehozása"""
